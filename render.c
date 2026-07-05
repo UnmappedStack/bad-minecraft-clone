@@ -6,7 +6,7 @@
 
 // Draw cube with a different texture piece applied to all faces, and returns number of faces drawn
 uint8_t DrawCubeTextureRec(Texture2D texture, Rectangle sources[6], Vector3 position, float width, float height, float length,
-                                                                                                    Color color, bool *sides_not_air, int light){
+                                                                    Color color, bool *sides_not_air, uint8_t *light_levels){
     float x = position.x;
     float y = position.y;
     float z = position.z;
@@ -14,16 +14,34 @@ uint8_t DrawCubeTextureRec(Texture2D texture, Rectangle sources[6], Vector3 posi
     float texHeight = (float)texture.height;
     rlSetTexture(texture.id);
     uint8_t ret = 0;
-
     // Set desired texture to be enabled while drawing following vertex data
 
     // We calculate the normalized texture coordinates for the desired texture-source-rectangle
     // It means converting from (tex.width, tex.height) coordinates to [0.0f, 1.0f] equivalent
     rlBegin(RL_QUADS);
-        rlColor4ub(color.r, color.g, color.b, color.a);
+        // Back face
+        rlColor4ub(color.r*(1.0f-0.15f*5+(light_levels[FACE_BACK]*0.15)),
+                   color.g*(1.0f-0.15f*5+(light_levels[FACE_BACK]*0.15)),
+                   color.b*(1.0f-0.15f*5+(light_levels[FACE_BACK]*0.15)), color.a);
+        Rectangle source = sources[1];
+        if (!sides_not_air[FACE_BACK]) {
+            rlNormal3f(0.0f, 0.0f, - 1.0f);
+            rlTexCoord2f((source.x + source.width)/texWidth, (source.y + source.height)/texHeight);
+            rlVertex3f(x - width/2, y - height/2, z - length/2);
+            rlTexCoord2f((source.x + source.width)/texWidth, source.y/texHeight);
+            rlVertex3f(x - width/2, y + height/2, z - length/2);
+            rlTexCoord2f(source.x/texWidth, source.y/texHeight);
+            rlVertex3f(x + width/2, y + height/2, z - length/2);
+            rlTexCoord2f(source.x/texWidth, (source.y + source.height)/texHeight);
+            rlVertex3f(x + width/2, y - height/2, z - length/2);
+            ret++;
+        }
 
         // Front face
-        Rectangle source = sources[0];
+        rlColor4ub(color.r*(1.0f-0.15f*5+(light_levels[FACE_FRONT]*0.15)),
+                   color.g*(1.0f-0.15f*5+(light_levels[FACE_FRONT]*0.15)),
+                   color.b*(1.0f-0.15f*5+(light_levels[FACE_FRONT]*0.15)), color.a);
+        source = sources[0];
         if (!sides_not_air[FACE_FRONT]) {
             rlNormal3f(0.0f, 0.0f, 1.0f);
             rlTexCoord2f(source.x/texWidth, (source.y + source.height)/texHeight);
@@ -37,22 +55,10 @@ uint8_t DrawCubeTextureRec(Texture2D texture, Rectangle sources[6], Vector3 posi
             ret++;
         }
 
-        // Back face
-        if (!sides_not_air[FACE_BACK]) {
-            source = sources[1];
-            rlNormal3f(0.0f, 0.0f, - 1.0f);
-            rlTexCoord2f((source.x + source.width)/texWidth, (source.y + source.height)/texHeight);
-            rlVertex3f(x - width/2, y - height/2, z - length/2);
-            rlTexCoord2f((source.x + source.width)/texWidth, source.y/texHeight);
-            rlVertex3f(x - width/2, y + height/2, z - length/2);
-            rlTexCoord2f(source.x/texWidth, source.y/texHeight);
-            rlVertex3f(x + width/2, y + height/2, z - length/2);
-            rlTexCoord2f(source.x/texWidth, (source.y + source.height)/texHeight);
-            rlVertex3f(x + width/2, y - height/2, z - length/2);
-            ret++;
-        }
-
         // Bottom face
+        rlColor4ub(color.r*(1.0f-0.15f*5+(light_levels[FACE_BOTTOM]*0.15)),
+                   color.g*(1.0f-0.15f*5+(light_levels[FACE_BOTTOM]*0.15)),
+                   color.b*(1.0f-0.15f*5+(light_levels[FACE_BOTTOM]*0.15)), color.a);
         if (!sides_not_air[FACE_BOTTOM]) {
             source = sources[3];
             rlNormal3f(0.0f, - 1.0f, 0.0f);
@@ -68,6 +74,9 @@ uint8_t DrawCubeTextureRec(Texture2D texture, Rectangle sources[6], Vector3 posi
         }
 
         // Right face
+        rlColor4ub(color.r*(1.0f-0.15f*5+(light_levels[FACE_RIGHT]*0.15)),
+                   color.g*(1.0f-0.15f*5+(light_levels[FACE_RIGHT]*0.15)),
+                   color.b*(1.0f-0.15f*5+(light_levels[FACE_RIGHT]*0.15)), color.a);
         if (!sides_not_air[FACE_RIGHT]) {
             source = sources[4];
             rlNormal3f(1.0f, 0.0f, 0.0f);
@@ -83,6 +92,9 @@ uint8_t DrawCubeTextureRec(Texture2D texture, Rectangle sources[6], Vector3 posi
         }
 
         // Left face
+        rlColor4ub(color.r*(1.0f-0.15f*5+(light_levels[FACE_LEFT]*0.15)),
+                   color.g*(1.0f-0.15f*5+(light_levels[FACE_LEFT]*0.15)),
+                   color.b*(1.0f-0.15f*5+(light_levels[FACE_LEFT]*0.15)), color.a);
         if (!sides_not_air[FACE_LEFT]) {
             source = sources[5];
             rlNormal3f( - 1.0f, 0.0f, 0.0f);
@@ -98,6 +110,9 @@ uint8_t DrawCubeTextureRec(Texture2D texture, Rectangle sources[6], Vector3 posi
         }
 
         // Top face
+        rlColor4ub(color.r*(1.0f-0.15f*5+(light_levels[FACE_TOP]*0.15)),
+                   color.g*(1.0f-0.15f*5+(light_levels[FACE_TOP]*0.15)),
+                   color.b*(1.0f-0.15f*5+(light_levels[FACE_TOP]*0.15)), color.a);
         if (!sides_not_air[FACE_TOP]) {
             source = sources[2];
             rlNormal3f(0.0f, 1.0f, 0.0f);
@@ -109,20 +124,6 @@ uint8_t DrawCubeTextureRec(Texture2D texture, Rectangle sources[6], Vector3 posi
             rlVertex3f(x + width/2, y + height/2, z + length/2);
             rlTexCoord2f((source.x + source.width)/texWidth, source.y/texHeight);
             rlVertex3f(x + width/2, y + height/2, z - length/2);
-            ret++;
-            
-            // draw lighting cover
-            rlSetTexture(0);
-            rlColor4ub(0, 0, 0, 0xcc*(light*0.2f));
-            rlTexCoord2f(source.x/texWidth, source.y/texHeight);
-            rlVertex3f(x - width/2, y + height/2, z - length/2);
-            rlTexCoord2f(source.x/texWidth, (source.y + source.height)/texHeight);
-            rlVertex3f(x - width/2, y + height/2, z + length/2);
-            rlTexCoord2f((source.x + source.width)/texWidth, (source.y + source.height)/texHeight);
-            rlVertex3f(x + width/2, y + height/2, z + length/2);
-            rlTexCoord2f((source.x + source.width)/texWidth, source.y/texHeight);
-            rlVertex3f(x + width/2, y + height/2, z - length/2);
-            rlSetTexture(texture.id);
             ret++;
         }
 

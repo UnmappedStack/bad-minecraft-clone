@@ -1,6 +1,7 @@
 #pragma once
 #include "raylib.h"
-#include "stdint.h"
+#include "list.h"
+#include <stdint.h>
 
 #define BLOCK_SIZE       2.0f
 #define NUM_CHUNKS       6
@@ -17,8 +18,15 @@ typedef struct {
     Rectangle *texture;
     BoundingBox collision_box;
     bool not_air;
-    float light_level; // 0-15
+    uint8_t light_levels[6]; // 0-4, for faces
+    uint8_t internal_light_level; // 0-4, for the block overall (for air blocks, mainly)
+    bool light_emitting;
 } Block;
+
+typedef struct {
+    struct list list;
+    Block *block;
+} BlockList;
 
 typedef struct {
     Block cubes[MAX_CHUNK_SIZE];

@@ -59,16 +59,12 @@ void flood_fill_light_from(Block *block, Chunk *chunk, bool set_zero) {
     uint8_t light_dist = 5; // including source
     for (uint8_t y = 0; y < light_dist*2-1; y++) {
         uint8_t sub = (y < light_dist) ? (light_dist-y) - 1 : (y - light_dist + 1);
-        uint8_t line_len = (light_dist - sub)*2-1;
-        for (uint8_t z = 0; z < line_len; z++) {
-            for (uint8_t x = 0; x < line_len; x++) {
-                Block *this_block = &chunk->cubes[get_xyz_idx(block->loc_cube.x+x-(line_len/2),y+block->loc_cube.y-4,block->loc_cube.z+z-(line_len/2))];
-                uint8_t dist_x = abs(block->loc_cube.x - this_block->loc_cube.x);
-                uint8_t dist_y = abs(block->loc_cube.y - this_block->loc_cube.y);
-                uint8_t dist_z = abs(block->loc_cube.z - this_block->loc_cube.z);
-                uint8_t dist = dist_x + dist_y + dist_z;
-                if (dist > 5) continue;
-                this_block->internal_light_level = 5 - dist;
+        uint8_t z_line_len = (light_dist - sub)*2-1;
+        for (uint8_t z = 0; z < z_line_len; z++) {
+            uint8_t x_line_len = z_line_len - 1;
+            for (uint8_t x = 0; x < x_line_len; x++) {
+                Block *this_block = &chunk->cubes[get_xyz_idx(block->loc_cube.x+x-(x_line_len/2),y+block->loc_cube.y-4,block->loc_cube.z+z-(z_line_len/2))];
+                this_block->internal_light_level = 4;
                 memset(this_block->light_levels, this_block->internal_light_level, 6*sizeof(uint8_t));
             }
         }
