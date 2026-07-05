@@ -7,10 +7,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-Block *place_on_face(Faces collision_face, Chunk *chunk, Block *target_block, Rectangle *texture);
-Faces get_face_collisions(Ray crosshair_ray, Block *target_block, Camera *camera);
-uint8_t DrawCubeTextureRec(Texture2D texture, Rectangle *source, Vector3 position, float width, float height, float length,
-        Color color, bool *sides_not_air, int light);
+Face get_face_collisions(Ray crosshair_ray, Block *target_block, Camera *camera);
 
 Rectangle get_texture_rect(Texture2D texture, int x, int y) {
     int cube_sz = texture.width/16;
@@ -22,10 +19,13 @@ Rectangle get_texture_rect(Texture2D texture, int x, int y) {
 }
 
 // for blocks with all 6 sides with the same texture
-void load_basic_block_texture(Texture atlas, int atlas_x, int atlas_y, Rectangle *buf) {
+void load_basic_block_texture(Texture atlas, int atlas_x, int atlas_y, BlockType type) {
     for (int face = 0; face < 6; face++)
-        buf[face] = get_texture_rect(atlas, atlas_x, atlas_y);
+        texture_uvs[type][face] = get_texture_rect(atlas, atlas_x, atlas_y);
 }
+
+Material block_material;
+Rectangle texture_uvs[BLOCK_TYPES_COUNT][6];
 
 int main(void) {
     const float screen_scale = 1.5f;
@@ -35,7 +35,7 @@ int main(void) {
     InitWindow(screen_width, screen_height, "game");
 
     Camera3D camera = { 0 };
-    camera.position = (Vector3){ 10.0f, CHUNK_HEIGHT * BLOCK_SIZE + BLOCK_SIZE * 1.0f, 10.0f };
+    camera.position = (Vector3){ 10.0f, BLOCK_SIZE * 54.0f, 10.0f };
     camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };
     camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };
     camera.fovy = 70.0f; 
@@ -47,51 +47,32 @@ int main(void) {
     Texture2D crosshair = LoadTexture("crosshair.png");
     Texture2D hotbar    = LoadTexture("hotbar.png");
     Texture2D selector  = LoadTexture("hotbar_selector.png");
+    block_material = LoadMaterialDefault();
+    block_material.maps[MATERIAL_MAP_DIFFUSE].texture = texture;
 
-    // hotbar textures: stone, dirt, oak planks, cobblestone, sand, gravel, oak logs, bricks, glowstone
-    Rectangle dirt_texture[6], cobblestone_texture[6], bedrock_texture[6], grass_texture[6], glowstone_texture[6], 
-              stone_texture[6], oak_planks_texture[6], sand_texture[6], gravel_texture[6], oak_log_texture[6], bricks_texture[6];
-    load_basic_block_texture(texture, 3, 0, grass_texture);
-    load_basic_block_texture(texture, 2, 0, dirt_texture);
-    load_basic_block_texture(texture, 0, 1, cobblestone_texture);
-    load_basic_block_texture(texture, 1, 1, bedrock_texture);
-    load_basic_block_texture(texture, 9, 6, glowstone_texture);
-    load_basic_block_texture(texture, 1, 0, stone_texture);
-    load_basic_block_texture(texture, 4, 0, oak_planks_texture);
-    load_basic_block_texture(texture, 2, 1, sand_texture);
-    load_basic_block_texture(texture, 3, 1, gravel_texture);
-    load_basic_block_texture(texture, 4, 1, oak_log_texture);
-    load_basic_block_texture(texture, 7, 0, bricks_texture);
+    // textures: stone, dirt, oak planks, cobblestone, sand, gravel, oak logs, bricks, glowstone
+    load_basic_block_texture(texture, 3, 0, BLOCK_GRASS);
+    load_basic_block_texture(texture, 2, 0, BLOCK_DIRT);
+    load_basic_block_texture(texture, 0, 1, BLOCK_COBBLESTONE);
+    load_basic_block_texture(texture, 1, 1, BLOCK_BEDROCK);
+    load_basic_block_texture(texture, 9, 6, BLOCK_GLOWSTONE);
+    load_basic_block_texture(texture, 1, 0, BLOCK_STONE);
+    load_basic_block_texture(texture, 4, 0, BLOCK_OAK_PLANK);
+    load_basic_block_texture(texture, 2, 1, BLOCK_SAND);
+    load_basic_block_texture(texture, 3, 1, BLOCK_GRAVEL);
+    load_basic_block_texture(texture, 4, 1, BLOCK_OAK_PLANK);
+    load_basic_block_texture(texture, 7, 0, BLOCK_BRICKS);
     
-    grass_texture[FACE_TOP] = get_texture_rect(texture, 8, 2);
-    grass_texture[FACE_BOTTOM] = get_texture_rect(texture, 2, 0);
+    texture_uvs[BLOCK_GRASS][FACE_TOP] = get_texture_rect(texture, 8, 2);
+    texture_uvs[BLOCK_GRASS][FACE_BOTTOM] = get_texture_rect(texture, 2, 0);
 
-    oak_log_texture[FACE_TOP] = oak_log_texture[FACE_BOTTOM] = get_texture_rect(texture, 5, 1);
+    texture_uvs[BLOCK_OAK_LOG][FACE_TOP] = texture_uvs[BLOCK_OAK_LOG][FACE_BOTTOM] = get_texture_rect(texture, 5, 1);
     
     int8_t hotbar_selected = 0; // 0-8
-    Rectangle *hotbar_slots[9] = {
-        stone_texture, dirt_texture, oak_planks_texture, cobblestone_texture,
-        sand_texture, gravel_texture, oak_log_texture, bricks_texture, glowstone_texture
+    BlockType hotbar_slots[9] = {
+        BLOCK_STONE, BLOCK_DIRT, BLOCK_OAK_PLANK, BLOCK_COBBLESTONE,
+        BLOCK_SAND, BLOCK_GRAVEL, BLOCK_OAK_LOG, BLOCK_BRICKS, BLOCK_GLOWSTONE,
     };
-
-    Chunk *chunk = (Chunk*) malloc(sizeof(Chunk));
-    for (int y = 0; y < CHUNK_HEIGHT; y++) {
-        Rectangle *texture = (y==CHUNK_HEIGHT-1) ? grass_texture : ((!y) ? bedrock_texture : dirt_texture);
-        for (int x = 0; x < CHUNK_WIDTH; x++) {
-            for (int z = 0; z < CHUNK_WIDTH; z++) {
-                Block *cube = &chunk->cubes[(y*CHUNK_AREA)+(x*CHUNK_WIDTH)+z];
-                cube->loc = (Vector3){x*BLOCK_SIZE, y*BLOCK_SIZE, z*BLOCK_SIZE};
-                cube->loc_cube = (Vector3){x, y, z};
-                cube->texture = texture;
-                cube->not_air = true;
-                cube->collision_box = 
-                    (BoundingBox) {
-                        (Vector3){cube->loc.x-BLOCK_SIZE/2, cube->loc.y-BLOCK_SIZE/2, cube->loc.z-BLOCK_SIZE/2},
-                        (Vector3){cube->loc.x+BLOCK_SIZE/2, cube->loc.y+BLOCK_SIZE/2, cube->loc.z+BLOCK_SIZE/2}
-                    };
-            }
-        }
-    }
 
     DisableCursor();
     SetTargetFPS(80);
@@ -99,10 +80,10 @@ int main(void) {
     int blocks_placed = 0;
     int num_faces = CHUNK_SIZE * 6;
     while (!WindowShouldClose()) {
-        UpdateCamera(&camera, CAMERA_FIRST_PERSON);
+        //UpdateCamera(&camera, CAMERA_FIRST_PERSON);
         UpdateCameraPro(&camera,
             (Vector3){ // wasd
-                IsKeyDown(KEY_W)*0.1f - IsKeyDown(KEY_S)*0.1f,
+                (IsKeyDown(KEY_W)||IsKeyDown(KEY_UP))*0.1f - IsKeyDown(KEY_S)*0.1f,
                 IsKeyDown(KEY_D)*0.1f - IsKeyDown(KEY_A)*0.1f,
                 IsKeyDown(KEY_SPACE)*0.3f - IsKeyDown(KEY_LEFT_SHIFT)*0.3f
             },
@@ -132,48 +113,31 @@ int main(void) {
         int rendered = 0;
         Block *target_block = NULL;
         float target_block_dist = 0;
-        for (size_t i = 0; i < MAX_CHUNK_SIZE; i++) {
-            // don't render cubes that aren't exposed
-            Block this_cube = chunk->cubes[i];
-            int x = this_cube.loc_cube.x;
-            int y = this_cube.loc_cube.y;
-            int z = this_cube.loc_cube.z;
-            bool sides_not_air[6] = {0};
-            sides_not_air[FACE_FRONT ] = z < CHUNK_WIDTH-1 && chunk->cubes[(y*CHUNK_AREA)+(x*CHUNK_WIDTH)+(z+1)].not_air;
-            sides_not_air[FACE_BACK  ] = z > 0 && chunk->cubes[(y*CHUNK_AREA)+(x*CHUNK_WIDTH)+(z-1)].not_air;
-            sides_not_air[FACE_RIGHT ] = x < CHUNK_WIDTH-1 && chunk->cubes[(y*CHUNK_AREA)+((x+1)*CHUNK_WIDTH)+z].not_air;
-            sides_not_air[FACE_LEFT  ] = x > 0 && chunk->cubes[(y*CHUNK_AREA)+((x-1)*CHUNK_WIDTH)+z].not_air;
-            sides_not_air[FACE_BOTTOM] = y > 0 && chunk->cubes[((y-1)*CHUNK_AREA)+(x*CHUNK_WIDTH)+z].not_air;
-            sides_not_air[FACE_TOP   ] = y < MAX_BUILD_HEIGHT-1 && chunk->cubes[((y+1)*CHUNK_AREA)+(x*CHUNK_WIDTH)+z].not_air;
-            bool face_is_visible = false;
-            for (uint8_t face = 0; face < FACE_NONE; face++) {
-                if (!sides_not_air[face]) continue;
-                face_is_visible = true;
-                break;
-            }
-            if (!chunk->cubes[i].not_air || !face_is_visible) continue;
-            RayCollision collision = GetRayCollisionBox(crosshair_ray, chunk->cubes[i].collision_box);
-            if (collision.hit) {
-                float dist = collision.distance;
-                if (target_block == NULL || dist < target_block_dist) {
-                    target_block = &chunk->cubes[i];
-                    target_block_dist = dist;
-                }
-            }
-            rendered += DrawCubeTextureRec(texture, chunk->cubes[i].texture, chunk->cubes[i].loc,
-                    BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, WHITE, sides_not_air, chunk->cubes[i].light_level);
-        }
+	// TODO : draw chunks around player
+	long block_x = camera.position.x / BLOCK_SIZE;
+	long block_y = camera.position.y / BLOCK_SIZE;
+	long block_z = camera.position.z / BLOCK_SIZE;
+	long chunk_x, chunk_z;
+	get_chunk_coord_for_block(block_x, block_y, block_z, &chunk_x, &chunk_z);
+	int render_distance = 7;
+	for (int x=-render_distance; x<=render_distance; x++) {
+		for (int z=-render_distance; z<=render_distance; z++) {
+			Chunk *chunk = get_chunk(chunk_x + x, chunk_z + z);
+			draw_chunk(chunk);
+		}
+	}
         if (target_block != NULL && target_block_dist <= 5 * BLOCK_SIZE) {
             DrawCubeWires(target_block->loc, BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, WHITE);     
             if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                 num_faces -= 6;
-                target_block->not_air = false;
+                target_block->type = BLOCK_AIR;
+		// TODO : mark dirty
             }
 
-            if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && hotbar_slots[hotbar_selected] != NULL) {
+            /*if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && hotbar_slots[hotbar_selected] != BLOCK_NONE) {
                 // point a ray at each face, check collision, and place on the face it collides with
                 // which is closest to the camera
-                Faces collision_face = get_face_collisions(crosshair_ray, target_block, &camera);
+                Face collision_face = get_face_collisions(crosshair_ray, target_block, &camera);
                 Block *block_placed = place_on_face(collision_face, chunk, target_block, hotbar_slots[hotbar_selected]);
                 if (block_placed != NULL) {
                     block_placed->light_level = blocks_placed%5;
@@ -181,7 +145,7 @@ int main(void) {
                 }
                 blocks_placed++;
                 num_faces += 6;
-            }
+            }*/
         }
 
         EndMode3D();
@@ -210,17 +174,16 @@ int main(void) {
                           screen_height-hotbar.height*1.5f-11},
                 0, 3, WHITE);
         for (int i = 0; i < 9; i++) {
-            if (hotbar_slots[i] == NULL) continue;
+            if (hotbar_slots[i] == BLOCK_NONE) continue;
             Rectangle dest_rec = {screen_width/2-hotbar.width*1.5f/2 + i * selector.width*2.5f - 1 + 18, // x
                                  screen_height-hotbar.height*1.5f-11 + 18, // y
                                  35, 35};
-            DrawTexturePro(texture, *hotbar_slots[i], dest_rec, (Vector2){0, 0}, 0.0f, WHITE);
+            DrawTexturePro(texture, texture_uvs[hotbar_slots[i]][FACE_FRONT], dest_rec, (Vector2){0, 0}, 0.0f, WHITE);
         }
         DrawBillboard(camera, hotbar, (Vector3) {0,CHUNK_HEIGHT*2+5,0}, 1, WHITE); // Draw a billboard texture
         EndDrawing();
     }
 
-    free(chunk);
     UnloadTexture(texture);
     UnloadTexture(crosshair);
     UnloadTexture(hotbar);

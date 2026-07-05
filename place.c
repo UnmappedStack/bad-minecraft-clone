@@ -4,7 +4,7 @@
 /* disgusting code in another file so i dont have to look at it
  * it's used for placing blocks and stuff like finding which face is being looked at */
 
-Faces get_face_collisions(Ray crosshair_ray, Block *target_block, Camera *camera) {
+Face get_face_collisions(Ray crosshair_ray, Block *target_block, Camera *camera) {
     RayCollision collides_top, collides_bottom, collides_left, collides_right, collides_front, collides_back;
     collides_top = GetRayCollisionBox(crosshair_ray,
             (BoundingBox) {
@@ -12,7 +12,7 @@ Faces get_face_collisions(Ray crosshair_ray, Block *target_block, Camera *camera
                     target_block->collision_box.min.x,
                     target_block->collision_box.max.y - 0.1,
                     target_block->collision_box.min.z,
-                }, target_block->collision_box.max
+		    }, target_block->collision_box.max
             });
     collides_bottom = GetRayCollisionBox(crosshair_ray,
             (BoundingBox) {
@@ -71,7 +71,7 @@ Faces get_face_collisions(Ray crosshair_ray, Block *target_block, Camera *camera
     else return FACE_NONE;
 }
 
-Block *place_on_face(Faces collision_face, Chunk *chunk, Block *target_block, Rectangle *texture) {
+Block *place_on_face(Face collision_face, Chunk *chunk, Block *target_block, BlockType type) {
     Block *new_block;
     switch (collision_face) {
     case FACE_TOP:
@@ -119,8 +119,7 @@ Block *place_on_face(Faces collision_face, Chunk *chunk, Block *target_block, Re
     default:
         return NULL;
     }
-    new_block->not_air = true;
-    new_block->texture = texture;
+    new_block->type = type;
     new_block->collision_box = 
         (BoundingBox) {
             (Vector3){new_block->loc.x-BLOCK_SIZE/2, new_block->loc.y-BLOCK_SIZE/2, new_block->loc.z-BLOCK_SIZE/2},
