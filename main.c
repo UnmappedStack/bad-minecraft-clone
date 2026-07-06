@@ -33,10 +33,10 @@ int get_xyz_idx(int x, int y, int z) {
 }
 
 void flood_fill_light_from(Block *block, Chunk *chunk, bool set_zero) {
-    uint8_t light_dist = 5; // including source
-    for (uint8_t y = 0; y < light_dist*2-1; y++) {
+    uint8_t light_dist = block->internal_light_level+1; // including source
+    for (uint8_t y = 0; y < light_dist*2+1; y++) {
         uint8_t sub = (y < light_dist) ? (light_dist-y) - 1 : (y - light_dist + 1);
-        uint8_t line_len = (light_dist - sub)*2-1;
+        uint8_t line_len = (light_dist - sub)*2+1;
         for (uint8_t z = 0; z < line_len; z++) {
             for (uint8_t x = 0; x < line_len; x++) {
                 /* TODO/FIXME:
@@ -49,10 +49,11 @@ void flood_fill_light_from(Block *block, Chunk *chunk, bool set_zero) {
                 uint8_t dist_y = abs(block->loc_cube.y - this_block->loc_cube.y);
                 uint8_t dist_z = abs(block->loc_cube.z - this_block->loc_cube.z);
                 uint8_t dist = dist_x + dist_y + dist_z;
-                if (dist > 5) continue;
-                this_block->internal_light_level += 5 - dist;
+                if (dist > light_dist) continue;
+                this_block->internal_light_level += light_dist - dist;
                 if (set_zero) this_block->internal_light_level = 0;
-                if (this_block->internal_light_level > 4) this_block->internal_light_level = 4;
+                if (this_block->internal_light_level > block->internal_light_level)
+                    this_block->internal_light_level = block->internal_light_level;
 
                 // now for each solid block touching this air block, translate its light level onto the face it's touching
                 int block_indices[] = {
@@ -241,10 +242,8 @@ int main(void) {
                         BlockList *new_blocklist = (BlockList*) malloc(sizeof(BlockList));
                         new_blocklist->block = block_placed;
                         list_insert(&light_emitting_blocks, &new_blocklist->list);
-                        memset(block_placed->light_levels, 4, 6*sizeof(uint8_t));
                         block_placed->internal_light_level = 4;
                     } else {
-                        memset(block_placed->light_levels, 0, 6*sizeof(uint8_t));
                         block_placed->internal_light_level = 0;
                     }
                 }

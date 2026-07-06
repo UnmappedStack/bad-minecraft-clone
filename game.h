@@ -19,7 +19,8 @@ typedef struct {
     BoundingBox collision_box;
     bool not_air;
     uint8_t light_levels[6]; // 0-4, for faces
-    uint8_t internal_light_level; // 0-4, for the block overall (for air blocks, mainly)
+    uint8_t internal_light_level; // 0-4, for the block overall (for air blocks, mainly).
+                                  // if this is a light emitting block, this is the amount of light it emits.
     bool light_emitting;
 } Block;
 
