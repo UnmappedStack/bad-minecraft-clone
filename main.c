@@ -39,12 +39,11 @@ void flood_fill_light_from(Block *block, Chunk *chunk, bool set_zero) {
         uint8_t line_len = (light_dist - sub)*2-1;
         for (uint8_t z = 0; z < line_len; z++) {
             for (uint8_t x = 0; x < line_len; x++) {
+                /* TODO/FIXME:
+                 * Currently a bunch of expensive unnecessary calculations are done when set_zero is true. These should be skipped if it is true because
+                 * they go unused. Primarily, the distance calculations. */
                 Block *this_block = &chunk->cubes[get_xyz_idx(block->loc_cube.x+x-(line_len/2),y+block->loc_cube.y-4,block->loc_cube.z+z-(line_len/2))];
                 if (this_block->light_emitting) continue;
-                if (set_zero) {
-                    this_block->internal_light_level = 0;
-                    continue;
-                }
                 if (this_block->not_air) continue;
                 uint8_t dist_x = abs(block->loc_cube.x - this_block->loc_cube.x);
                 uint8_t dist_y = abs(block->loc_cube.y - this_block->loc_cube.y);
@@ -52,6 +51,7 @@ void flood_fill_light_from(Block *block, Chunk *chunk, bool set_zero) {
                 uint8_t dist = dist_x + dist_y + dist_z;
                 if (dist > 5) continue;
                 this_block->internal_light_level += 5 - dist;
+                if (set_zero) this_block->internal_light_level = 0;
                 if (this_block->internal_light_level > 4) this_block->internal_light_level = 4;
 
                 // now for each solid block touching this air block, translate its light level onto the face it's touching
@@ -219,6 +219,7 @@ int main(void) {
                 block_update = true;
                 num_faces -= 6;
                 target_block->not_air = false;
+                target_block->light_emitting = false;
                 for (struct list *at = light_emitting_blocks.next;
                         at != &light_emitting_blocks; at = at->next) {
                     if (((BlockList*)at)->block != target_block) continue;
