@@ -43,9 +43,9 @@ void flood_fill_light_from(Block *block, Chunk *chunk, bool set_zero) {
                 if (this_block->light_emitting) continue;
                 if (set_zero) {
                     this_block->internal_light_level = 0;
-                    memset(this_block->light_levels, this_block->internal_light_level, 6*sizeof(uint8_t));
                     continue;
                 }
+                if (this_block->not_air) continue;
                 uint8_t dist_x = abs(block->loc_cube.x - this_block->loc_cube.x);
                 uint8_t dist_y = abs(block->loc_cube.y - this_block->loc_cube.y);
                 uint8_t dist_z = abs(block->loc_cube.z - this_block->loc_cube.z);
@@ -53,7 +53,21 @@ void flood_fill_light_from(Block *block, Chunk *chunk, bool set_zero) {
                 if (dist > 5) continue;
                 this_block->internal_light_level += 5 - dist;
                 if (this_block->internal_light_level > 4) this_block->internal_light_level = 4;
-                memset(this_block->light_levels, this_block->internal_light_level, 6*sizeof(uint8_t));
+
+                // now for each solid block touching this air block, translate its light level onto the face it's touching
+                int block_indices[] = {
+                    [FACE_FRONT ] = get_xyz_idx(this_block->loc_cube.x,   this_block->loc_cube.y,   this_block->loc_cube.z-1),
+                    [FACE_BACK  ] = get_xyz_idx(this_block->loc_cube.x,   this_block->loc_cube.y,   this_block->loc_cube.z+1),
+                    [FACE_TOP   ] = get_xyz_idx(this_block->loc_cube.x,   this_block->loc_cube.y-1, this_block->loc_cube.z  ),
+                    [FACE_BOTTOM] = get_xyz_idx(this_block->loc_cube.x,   this_block->loc_cube.y+1, this_block->loc_cube.z  ),
+                    [FACE_RIGHT ] = get_xyz_idx(this_block->loc_cube.x-1, this_block->loc_cube.y,   this_block->loc_cube.z  ),
+                    [FACE_LEFT  ] = get_xyz_idx(this_block->loc_cube.x+1, this_block->loc_cube.y,   this_block->loc_cube.z  ),
+                };
+                for (uint8_t face = 0; face < FACE_NONE; face++) {
+                    Block *target_block = &chunk->cubes[block_indices[face]];
+                    if (!target_block->not_air) continue;
+                    target_block->light_levels[face] = this_block->internal_light_level;
+                }
             }
         }
     }
@@ -109,11 +123,17 @@ int main(void) {
     struct list light_emitting_blocks = {0};
     list_init(&light_emitting_blocks);
     Chunk *chunk = (Chunk*) malloc(sizeof(Chunk));
-    for (int y = 0; y < CHUNK_HEIGHT; y++) {
+    for (int y = 0; y < MAX_BUILD_HEIGHT; y++) {
         Rectangle *texture = (y==CHUNK_HEIGHT-1) ? grass_texture : ((!y) ? bedrock_texture : dirt_texture);
         for (int x = 0; x < CHUNK_WIDTH; x++) {
             for (int z = 0; z < CHUNK_WIDTH; z++) {
                 Block *cube = &chunk->cubes[get_xyz_idx(x,y,z)];
+                if (y >= CHUNK_HEIGHT) {
+                    cube->not_air = false;
+                    cube->loc = (Vector3){x*BLOCK_SIZE, y*BLOCK_SIZE, z*BLOCK_SIZE};
+                    cube->loc_cube = (Vector3){x, y, z};
+                    continue;           
+                }
                 cube->loc = (Vector3){x*BLOCK_SIZE, y*BLOCK_SIZE, z*BLOCK_SIZE};
                 cube->loc_cube = (Vector3){x, y, z};
                 cube->texture = texture;
