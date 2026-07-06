@@ -33,29 +33,6 @@ int get_xyz_idx(int x, int y, int z) {
 }
 
 void flood_fill_light_from(Block *block, Chunk *chunk, bool set_zero) {
-//    for (uint8_t i = 0; i < 4; i++) {
-//        uint8_t o = i + 1;
-//        uint8_t light_level = 4-i;
-//        Block *blocks[6] = {
-//            &chunk->cubes[get_xyz_idx(block->loc_cube.x,block->loc_cube.y+o,block->loc_cube.z)],
-//            &chunk->cubes[get_xyz_idx(block->loc_cube.x,block->loc_cube.y-o,block->loc_cube.z)],
-//            &chunk->cubes[get_xyz_idx(block->loc_cube.x+o,block->loc_cube.y,block->loc_cube.z)],
-//            &chunk->cubes[get_xyz_idx(block->loc_cube.x-o,block->loc_cube.y,block->loc_cube.z)],
-//            &chunk->cubes[get_xyz_idx(block->loc_cube.x,block->loc_cube.y,block->loc_cube.z+o)],
-//            &chunk->cubes[get_xyz_idx(block->loc_cube.x,block->loc_cube.y,block->loc_cube.z-o)]
-//        };
-//        for (uint8_t b = 0; b < 6; b++) {
-//            if (blocks[b]->light_emitting) continue;
-//            if (set_zero) {
-//                blocks[b]->internal_light_level = 0;
-//                continue;
-//            }
-//            blocks[b]->internal_light_level += light_level;
-//            if (blocks[b]->internal_light_level > 4) blocks[b]->internal_light_level = 4;
-//            blocks[b]->internal_light_level=4;
-//            memset(blocks[b]->light_levels, blocks[b]->internal_light_level, 6*sizeof(uint8_t));
-//        }
-//    }
     uint8_t light_dist = 5; // including source
     for (uint8_t y = 0; y < light_dist*2-1; y++) {
         uint8_t sub = (y < light_dist) ? (light_dist-y) - 1 : (y - light_dist + 1);
@@ -63,12 +40,19 @@ void flood_fill_light_from(Block *block, Chunk *chunk, bool set_zero) {
         for (uint8_t z = 0; z < line_len; z++) {
             for (uint8_t x = 0; x < line_len; x++) {
                 Block *this_block = &chunk->cubes[get_xyz_idx(block->loc_cube.x+x-(line_len/2),y+block->loc_cube.y-4,block->loc_cube.z+z-(line_len/2))];
+                if (this_block->light_emitting) continue;
+                if (set_zero) {
+                    this_block->internal_light_level = 0;
+                    memset(this_block->light_levels, this_block->internal_light_level, 6*sizeof(uint8_t));
+                    continue;
+                }
                 uint8_t dist_x = abs(block->loc_cube.x - this_block->loc_cube.x);
                 uint8_t dist_y = abs(block->loc_cube.y - this_block->loc_cube.y);
                 uint8_t dist_z = abs(block->loc_cube.z - this_block->loc_cube.z);
                 uint8_t dist = dist_x + dist_y + dist_z;
                 if (dist > 5) continue;
-                this_block->internal_light_level = 5 - dist;
+                this_block->internal_light_level += 5 - dist;
+                if (this_block->internal_light_level > 4) this_block->internal_light_level = 4;
                 memset(this_block->light_levels, this_block->internal_light_level, 6*sizeof(uint8_t));
             }
         }
@@ -215,6 +199,13 @@ int main(void) {
                 block_update = true;
                 num_faces -= 6;
                 target_block->not_air = false;
+                for (struct list *at = light_emitting_blocks.next;
+                        at != &light_emitting_blocks; at = at->next) {
+                    if (((BlockList*)at)->block != target_block) continue;
+                    flood_fill_light_from(((BlockList*)at)->block, chunk, true);
+                    list_remove(at);
+                    break;
+                }
             }
 
             if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && hotbar_slots[hotbar_selected] != NULL) {
