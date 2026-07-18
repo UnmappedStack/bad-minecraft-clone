@@ -6,7 +6,7 @@ please dont make me copy licences here and just accept me telling you what it is
 
 to build and run just do (in the repo's root directory):
 ./build.sh && ./out
-it's only tested to build on linux and i don't really care enough to try it on macos or anything
+For macos use ./build_mac.sh && ./out
 
 uhhh so its pretty simple controls:
  - WASD for movement mostly
